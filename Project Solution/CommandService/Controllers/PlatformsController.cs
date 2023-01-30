@@ -1,31 +1,89 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
+using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
+using PlatformService.AsyncDataServices;
+using PlatformService.Data;
+using PlatformService.Dtos;
+using PlatformService.Models;
+using PlatformService.SyncDataServices.Http;
 
-namespace CommandService.Controllers
+namespace PlatformService.Controllers
 {
+	[Route("api/[controller]")]
 	[ApiController]
-	[Route("api/c/[controller]")]
 	public class PlatformsController : ControllerBase
 	{
-		public PlatformsController()
+		private readonly IPlatformRepo _repository;
+		private readonly IMapper _mapper;
+		private readonly ICommandDataClient _commandDataClient;
+
+		public PlatformsController(
+			IPlatformRepo repository,
+			IMapper mapper,
+			ICommandDataClient commandDataClient
+			)
 		{
+			_repository = repository;
+			_mapper = mapper;
+			_commandDataClient = commandDataClient;
 		}
 
 		[HttpGet]
-		public ActionResult<IEnumerable<string>> GetPlatforms()
+		public ActionResult<IEnumerable<PlatformReadDto>> GetPlatforms()
 		{
-			return new string[] { "DotNet", "SQL Server", "Kubernetes" };
+			Console.WriteLine("--> Getting Platforms....");
+
+			var platformItem = _repository.GetAllPlatforms();
+
+			return Ok(_mapper.Map<IEnumerable<PlatformReadDto>>(platformItem));
+		}
+
+		[HttpGet("{id}", Name = "GetPlatformById")]
+		public ActionResult<PlatformReadDto> GetPlatformById(int id)
+		{
+			var platformItem = _repository.GetPlatformById(id);
+			if (platformItem != null)
+			{
+				return Ok(_mapper.Map<PlatformReadDto>(platformItem));
+			}
+
+			return NotFound();
 		}
 
 		[HttpPost]
-		public ActionResult testInboundConnection()
+		public async Task<ActionResult<PlatformReadDto>> CreatePlatform(PlatformCreateDto platformCreateDto)
 		{
-			Console.WriteLine("--> Inbound POST # Command Service");
-			return Ok("Inbound test of from Platforms Controller");
-		}
+			var platformModel = _mapper.Map<Platform>(platformCreateDto);
+			_repository.CreatePlatform(platformModel);
+			_repository.SaveChanges();
 
+			var platformReadDto = _mapper.Map<PlatformReadDto>(platformModel);
+
+			// Send Sync Message
+			try
+			{
+				await _commandDataClient.SendPlatformToCommand(platformReadDto);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"--> Could not send synchronously: {ex.Message}");
+			}
+
+			//Send Async Message
+			try
+			{
+				var platformPublishedDto = _mapper.Map<PlatformPublishedDto>(platformReadDto);
+				platformPublishedDto.Event = "Platform_Published";
+				_messageBusClient.PublishNewPlatform(platformPublishedDto);
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"--> Could not send asynchronously: {ex.Message}");
+			}
+
+			return CreatedAtRoute(nameof(GetPlatformById), new { Id = platformReadDto.Id }, platformReadDto);
+		}
 	}
 }
