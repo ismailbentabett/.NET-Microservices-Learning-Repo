@@ -13,7 +13,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using PlatformService.Data;
 using Microsoft.EntityFrameworkCore;
-
+using PlatformService.SyncDataServices.Http;
 namespace PlatformService
 {
 	public class Startup
@@ -31,6 +31,7 @@ namespace PlatformService
 			services.AddDbContext<AppDbContext>(opt => opt.UseInMemoryDatabase("InMem"));
 			services.AddScoped<IPlatformRepo, PlatformRepo>();
 			services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+			services.AddHttpClient<ICommandDataClient, HttpCommandDataClient>();
 
 			services.AddControllers();
 			services.AddSwaggerGen(c =>

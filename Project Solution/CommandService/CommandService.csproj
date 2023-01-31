@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
@@ -21,5 +21,13 @@
     <PackageReference Include="RabbitMQ.Client" Version="6.2.2" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="5.6.3" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PlatformService\PlatformService.csproj" />
+    <Folder Include="Controllers\" />
+  </ItemGroup>
+
+
+
 
 </Project>
